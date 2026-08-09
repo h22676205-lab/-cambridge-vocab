@@ -152,17 +152,10 @@
       </div>
     </div>
     <div class="settings-row">
-      <label class="title">念的語言</label>
-      <div class="seg" id="langSeg">
-        <button data-v="en" class="active">念英文</button>
-        <button data-v="zh">念中文</button>
-      </div>
-    </div>
-    <div class="settings-row">
       <label class="title">顯示文字</label>
       <div class="seg" id="showSeg">
         <button data-v="both" class="active">中英都顯示</button>
-        <button data-v="only">只顯示念的那個</button>
+        <button data-v="only">只顯示英文</button>
       </div>
     </div>
     <div class="settings-row">
@@ -230,13 +223,12 @@ function flattenGroup(groupKey){
   return words;
 }
 
-/* ===================== 語音 (TTS) ===================== */
+/* ===================== 語音 (TTS 備用) ===================== */
 let voices = [];
-let britishVoice = null, chineseVoice = null;
+let britishVoice = null;
 function loadVoices(){
   voices = speechSynthesis.getVoices();
   britishVoice = voices.find(v=>v.lang==="en-GB") || voices.find(v=>/en[-_]GB/i.test(v.lang)) || voices.find(v=>v.lang.startsWith("en"));
-  chineseVoice = voices.find(v=>/zh[-_]TW/i.test(v.lang)) || voices.find(v=>v.lang.startsWith("zh"));
   fillVoiceSelect();
 }
 speechSynthesis.onvoiceschanged = loadVoices;
@@ -272,20 +264,50 @@ speedRange.oninput = ()=>{
   speedVal.textContent = speechSpeed.toFixed(1) + "x";
 };
 
-function speak(text, lang){
+function speak(text){
   speechSynthesis.cancel();
   const utter = new SpeechSynthesisUtterance(text);
-  if(lang==="en"){
-    utter.lang = "en-GB";
-    if(britishVoice) utter.voice = britishVoice;
-    utter.rate = 0.85 * speechSpeed;
-  } else {
-    utter.lang = "zh-TW";
-    if(chineseVoice) utter.voice = chineseVoice;
-    utter.rate = 0.9 * speechSpeed;
-  }
+  utter.lang = "en-GB";
+  if(britishVoice) utter.voice = britishVoice;
+  utter.rate = 0.85 * speechSpeed;
   speechSynthesis.speak(utter);
   return utter;
+}
+
+/* ===================== 老師錄音（優先於 TTS） ===================== */
+const AUDIO_MAP = {
+  "bird":"bird.mp3","cat":"cat.mp3","chicken":"chicken.mp3","cow":"cow.mp3","crocodile":"crocodile.mp3",
+  "dog":"dog.mp3","duck":"duck.mp3","elephant":"elephant.mp3","fish":"fish.mp3","frog":"frog.mp3",
+  "tiger":"tiger.mp3","giraffe":"giraffe.mp3","goat":"goat.mp3","hippo":"hippo.mp3","horse":"horse.mp3",
+  "lizard":"lizard.mp3","monkey":"monkey.mp3","mouse":"mouse.mp3","sheep":"sheep.mp3","snake":"snake.mp3","spider":"spider.mp3",
+  "arm":"arm.mp3","ear":"ear.mp3","eye":"eye.mp3","face":"face.mp3","foot/feet":["foot.mp3","feet.mp3"],
+  "hair":"hair.mp3","hand":"hand.mp3","leg":"leg.mp3","mouth":"mouth.mp3","nose":"nose.mp3",
+  "dress":"dress.mp3","glasses":"glasses.mp3","handbag":"handbag.mp3","hat":"hat.mp3","jeans":"jeans.mp3",
+  "shirt":"shirt.mp3","shoe":"shoe.mp3","sock":"sock.mp3","trousers":"trousers.mp3","T-shirt":"tshirt.mp3",
+  "armchair":"armchair.mp3","bed":"bed.mp3","bedroom":"bedroom.mp3","camera":"camera.mp3","chair":"chair.mp3","clock":"clock.mp3",
+};
+
+let currentAudio = null;
+function stopAllAudio(){
+  speechSynthesis.cancel();
+  if(currentAudio){ currentAudio.onended = null; currentAudio.pause(); currentAudio = null; }
+}
+function playEnglish(en){
+  stopAllAudio();
+  const files = AUDIO_MAP[en];
+  if(!files){ speak(en); return; }
+  const list = Array.isArray(files) ? files : [files];
+  let i = 0;
+  const playNext = ()=>{
+    if(i >= list.length) return;
+    const audio = new Audio(`audio/${list[i]}`);
+    audio.playbackRate = speechSpeed;
+    audio.onended = ()=>{ i++; playNext(); };
+    audio.onerror = ()=> speak(en);
+    currentAudio = audio;
+    audio.play().catch(()=> speak(en));
+  };
+  playNext();
 }
 
 /* ===================== 分頁切換 ===================== */
@@ -348,8 +370,7 @@ function renderGrid(){
       <div class="spk">🔊</div>
     `;
     card.onclick = ()=>{
-      speak(en, "en");
-      setTimeout(()=> speak(zh, "zh"), 900);
+      playEnglish(en);
     };
     grid.appendChild(card);
   });
@@ -388,13 +409,6 @@ let orderMode = "seq";
 document.getElementById("orderSeg").onclick = (e)=>{
   const b = e.target.closest("button"); if(!b) return;
   orderMode = b.dataset.v;
-  [...e.currentTarget.children].forEach(x=>x.classList.toggle("active", x===b));
-};
-
-let langMode = "en";
-document.getElementById("langSeg").onclick = (e)=>{
-  const b = e.target.closest("button"); if(!b) return;
-  langMode = b.dataset.v;
   [...e.currentTarget.children].forEach(x=>x.classList.toggle("active", x===b));
 };
 
@@ -468,12 +482,10 @@ function nextQuizWord(){
   quizCatEl.textContent = w.cat;
   quizProgEl.textContent = (quizIndex+1) + " / " + quizQueue.length;
 
-  const showEn = (showMode==="both") || langMode==="en";
-  const showZh = (showMode==="both") || langMode==="zh";
-  quizEnEl.textContent = showEn ? w.en : "";
-  quizZhEl.textContent = showZh ? w.zh : "";
+  quizEnEl.textContent = w.en;
+  quizZhEl.textContent = (showMode==="both") ? w.zh : "";
 
-  speak(langMode==="en" ? w.en : w.zh, langMode);
+  playEnglish(w.en);
 
   const seconds = parseFloat(intervalRange.value);
   quizTimer = setTimeout(()=>{
@@ -486,7 +498,7 @@ function pauseQuiz(){
   quizPaused = !quizPaused;
   if(quizPaused){
     clearTimeout(quizTimer);
-    speechSynthesis.cancel();
+    stopAllAudio();
     btnPause.textContent = "▶️ 繼續";
   } else {
     btnPause.textContent = "⏸ 暫停";
@@ -498,7 +510,7 @@ function stopQuiz(){
   quizRunning = false;
   quizPaused = false;
   clearTimeout(quizTimer);
-  speechSynthesis.cancel();
+  stopAllAudio();
   btnStart.disabled = false;
   btnPause.disabled = true;
   btnStop.disabled = true;
