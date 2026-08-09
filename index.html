@@ -311,10 +311,25 @@ const AUDIO_MAP = {
   "television/TV":"television.mp3","tennis":"tennis.mp3","watch":"watch.mp3","woman":"woman.mp3",
 };
 
-let currentAudio = null;
+/* 手機瀏覽器（尤其 iOS Safari）只允許「已被使用者手動觸發過」的同一個 <audio>
+   元素繼續自動播放；每次都 new Audio() 會在考試模式連續自動播放幾個字後被瀏覽器擋掉、
+   從此靜音。所以整個 App 共用這一個元素，並在按下「開始測驗」等真人點擊時解鎖它。 */
+const audioPlayer = new Audio();
+let audioUnlocked = false;
+function unlockAudio(){
+  if(audioUnlocked) return;
+  audioUnlocked = true;
+  audioPlayer.play().catch(()=>{});
+  audioPlayer.pause();
+  const warmup = new SpeechSynthesisUtterance(" ");
+  warmup.volume = 0;
+  speechSynthesis.speak(warmup);
+}
+
 function stopAllAudio(){
   speechSynthesis.cancel();
-  if(currentAudio){ currentAudio.onended = null; currentAudio.pause(); currentAudio = null; }
+  audioPlayer.onended = null;
+  audioPlayer.pause();
 }
 function playEnglish(en){
   stopAllAudio();
@@ -324,12 +339,11 @@ function playEnglish(en){
   let i = 0;
   const playNext = ()=>{
     if(i >= list.length) return;
-    const audio = new Audio(`audio/${list[i]}`);
-    audio.playbackRate = speechSpeed;
-    audio.onended = ()=>{ i++; playNext(); };
-    audio.onerror = ()=> speak(en);
-    currentAudio = audio;
-    audio.play().catch(()=> speak(en));
+    audioPlayer.src = `audio/${list[i]}`;
+    audioPlayer.playbackRate = speechSpeed;
+    audioPlayer.onended = ()=>{ i++; playNext(); };
+    audioPlayer.onerror = ()=> speak(en);
+    audioPlayer.play().catch(()=> speak(en));
   };
   playNext();
 }
@@ -394,6 +408,7 @@ function renderGrid(){
       <div class="spk">🔊</div>
     `;
     card.onclick = ()=>{
+      unlockAudio();
       playEnglish(en);
     };
     grid.appendChild(card);
@@ -478,6 +493,7 @@ function buildQueue(){
 }
 
 function startQuiz(){
+  unlockAudio();
   quizQueue = buildQueue();
   if(quizQueue.length===0){
     alert("請至少選擇一個單字範圍！");
@@ -525,6 +541,7 @@ function pauseQuiz(){
     stopAllAudio();
     btnPause.textContent = "▶️ 繼續";
   } else {
+    unlockAudio();
     btnPause.textContent = "⏸ 暫停";
     nextQuizWord();
   }
