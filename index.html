@@ -59,12 +59,11 @@
     box-shadow:0 3px 10px rgba(0,0,0,.08); cursor:pointer; transition:transform .12s;
   }
   .card:active{ transform:scale(.96); }
-  .card .en{ font-size:1.15rem; font-weight:bold; color:#3a3a3a; word-break:break-word; }
+  .card .en{ font-size:1.3rem; font-weight:bold; color:#3a3a3a; word-break:break-word; }
   .card .zh{
-    font-size:1.9rem; margin-top:8px; letter-spacing:4px; color:#3a3a3a;
+    font-size:1.5rem; margin-top:8px; letter-spacing:4px; color:#3a3a3a;
     font-family:"BpmfZihiKaiStd","Microsoft JhengHei",serif;
   }
-  .card .spk{ margin-top:6px; font-size:1.3rem; }
 
   .settings-box{
     background:#fff; border-radius:16px; padding:18px; box-shadow:0 3px 10px rgba(0,0,0,.08); margin-bottom:20px;
@@ -380,7 +379,6 @@ function renderGrid(){
     card.innerHTML = `
       <div class="en">${en}</div>
       <div class="zh">${zh}</div>
-      <div class="spk">🔊</div>
     `;
     card.onclick = ()=>{
       unlockAudio();
