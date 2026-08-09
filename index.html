@@ -101,8 +101,6 @@
   .btn-pause{ background:var(--yellow); color:#7a5a00; }
   .btn:disabled{ opacity:.4; cursor:not-allowed; }
 
-  .small-note{ text-align:center; color:#999; font-size:.8rem; margin-top:10px; }
-  select#voiceSelect{ padding:6px 10px; border-radius:10px; border:1px solid #ccc; }
 </style>
 </head>
 <body>
@@ -163,10 +161,6 @@
       <input type="range" id="intervalRange" min="1" max="15" step="0.5" value="4">
       <span class="interval-val" id="intervalVal">4 秒</span>
     </div>
-    <div class="settings-row">
-      <label class="title">英式發音</label>
-      <select id="voiceSelect"></select>
-    </div>
   </div>
 
   <div class="quiz-stage">
@@ -181,7 +175,6 @@
     <button class="btn btn-pause" id="btnPause" disabled>⏸ 暫停</button>
     <button class="btn btn-stop" id="btnStop" disabled>⏹ 結束</button>
   </div>
-  <p class="small-note">若聽不到英式發音，代表裝置未安裝英式(en-GB)語音包，可在上方語音選單挑選最接近的聲音。</p>
 </div>
 
 <script>
@@ -246,32 +239,9 @@ function loadVoices(){
   voices = speechSynthesis.getVoices();
   const enVoices = voices.filter(v=>v.lang.startsWith("en"));
   britishVoice = enVoices.slice().sort((a,b)=> voiceScore(b) - voiceScore(a))[0] || null;
-  fillVoiceSelect();
 }
 speechSynthesis.onvoiceschanged = loadVoices;
 loadVoices();
-
-function fillVoiceSelect(){
-  const sel = document.getElementById("voiceSelect");
-  sel.innerHTML = "";
-  const enVoices = voices.filter(v=>v.lang.startsWith("en"));
-  if(enVoices.length===0){
-    const opt = document.createElement("option");
-    opt.textContent = "（尚未偵測到英文語音，稍候會自動載入）";
-    sel.appendChild(opt);
-    return;
-  }
-  enVoices.forEach((v,i)=>{
-    const opt = document.createElement("option");
-    opt.value = v.name;
-    opt.textContent = v.name + " (" + v.lang + ")" + (britishVoice && v.name===britishVoice.name ? " ⭐最接近老師" : "");
-    if(britishVoice && v.name===britishVoice.name) opt.selected = true;
-    sel.appendChild(opt);
-  });
-  sel.onchange = ()=>{
-    britishVoice = voices.find(v=>v.name===sel.value) || britishVoice;
-  };
-}
 
 let speechSpeed = 1;
 const speedRange = document.getElementById("speedRange");
