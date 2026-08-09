@@ -224,11 +224,27 @@ function flattenGroup(groupKey){
 }
 
 /* ===================== 語音 (TTS 備用) ===================== */
+/* 老師錄音測出的音調中位數約 180-270Hz，落在女性聲音範圍，
+   所以自動選音優先挑英式(en-GB)＋女性聲音，最接近老師的音色。 */
+const FEMALE_NAME_HINTS = ["female","kate","serena","martha","stephanie","samantha","ava","allison","susan","victoria","zoe","zoë","nicky","karen","moira","tessa","fiona","siri female"];
+const MALE_NAME_HINTS = ["male","daniel","arthur","ralph","oliver","alex","fred","tom","aaron","nathan","evan","siri male"];
+
+function voiceScore(v){
+  const name = v.name.toLowerCase();
+  let score = 0;
+  if(v.lang === "en-GB") score += 100;
+  else if(/^en-/i.test(v.lang)) score += 20;
+  if(FEMALE_NAME_HINTS.some(h=>name.includes(h))) score += 50;
+  else if(MALE_NAME_HINTS.some(h=>name.includes(h))) score -= 30;
+  return score;
+}
+
 let voices = [];
 let britishVoice = null;
 function loadVoices(){
   voices = speechSynthesis.getVoices();
-  britishVoice = voices.find(v=>v.lang==="en-GB") || voices.find(v=>/en[-_]GB/i.test(v.lang)) || voices.find(v=>v.lang.startsWith("en"));
+  const enVoices = voices.filter(v=>v.lang.startsWith("en"));
+  britishVoice = enVoices.slice().sort((a,b)=> voiceScore(b) - voiceScore(a))[0] || null;
   fillVoiceSelect();
 }
 speechSynthesis.onvoiceschanged = loadVoices;
@@ -247,7 +263,7 @@ function fillVoiceSelect(){
   enVoices.forEach((v,i)=>{
     const opt = document.createElement("option");
     opt.value = v.name;
-    opt.textContent = v.name + " (" + v.lang + ")" + (v.lang==="en-GB" ? " ⭐英式" : "");
+    opt.textContent = v.name + " (" + v.lang + ")" + (britishVoice && v.name===britishVoice.name ? " ⭐最接近老師" : "");
     if(britishVoice && v.name===britishVoice.name) opt.selected = true;
     sel.appendChild(opt);
   });
