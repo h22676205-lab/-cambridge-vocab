@@ -207,12 +207,6 @@ const DATE_CATEGORIES = [
 
 const GROUPS = { topic: CATEGORIES, week: DATE_CATEGORIES };
 
-/* 還沒有老師錄音的分類：這些字先不要退回機器語音，保持靜音，等老師錄好音再補上 */
-const NO_TTS_FALLBACK = new Set(
-  CATEGORIES.filter(([cat])=>cat.includes("未錄音")).flatMap(([,words])=>words.map(([en])=>en))
-);
-
-
 /* 依分類群組展開成扁平單字清單（附分類） */
 function flattenGroup(groupKey){
   const words = [];
@@ -222,32 +216,6 @@ function flattenGroup(groupKey){
   return words;
 }
 
-/* ===================== 語音 (TTS 備用) ===================== */
-/* 老師錄音測出的音調中位數約 180-270Hz，落在女性聲音範圍，
-   所以自動選音優先挑英式(en-GB)＋女性聲音，最接近老師的音色。 */
-const FEMALE_NAME_HINTS = ["female","kate","serena","martha","stephanie","samantha","ava","allison","susan","victoria","zoe","zoë","nicky","karen","moira","tessa","fiona","siri female"];
-const MALE_NAME_HINTS = ["male","daniel","arthur","ralph","oliver","alex","fred","tom","aaron","nathan","evan","siri male"];
-
-function voiceScore(v){
-  const name = v.name.toLowerCase();
-  let score = 0;
-  if(v.lang === "en-GB") score += 100;
-  else if(/^en-/i.test(v.lang)) score += 20;
-  if(FEMALE_NAME_HINTS.some(h=>name.includes(h))) score += 50;
-  else if(MALE_NAME_HINTS.some(h=>name.includes(h))) score -= 30;
-  return score;
-}
-
-let voices = [];
-let britishVoice = null;
-function loadVoices(){
-  voices = speechSynthesis.getVoices();
-  const enVoices = voices.filter(v=>v.lang.startsWith("en"));
-  britishVoice = enVoices.slice().sort((a,b)=> voiceScore(b) - voiceScore(a))[0] || null;
-}
-speechSynthesis.onvoiceschanged = loadVoices;
-loadVoices();
-
 let speechSpeed = 1;
 const speedRange = document.getElementById("speedRange");
 const speedVal = document.getElementById("speedVal");
@@ -255,16 +223,6 @@ speedRange.oninput = ()=>{
   speechSpeed = parseFloat(speedRange.value);
   speedVal.textContent = speechSpeed.toFixed(1) + "x";
 };
-
-function speak(text){
-  speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(text);
-  utter.lang = "en-GB";
-  if(britishVoice) utter.voice = britishVoice;
-  utter.rate = 0.85 * speechSpeed;
-  speechSynthesis.speak(utter);
-  return utter;
-}
 
 /* ===================== 老師錄音（優先於 TTS） ===================== */
 const AUDIO_MAP = {
@@ -305,15 +263,11 @@ function unlockAudio(){
   audioUnlocked = true;
   audioPlayer.play().catch(()=>{});
   audioPlayer.pause();
-  const warmup = new SpeechSynthesisUtterance(" ");
-  warmup.volume = 0;
-  speechSynthesis.speak(warmup);
 }
 
 let playToken = 0;
 function stopAllAudio(){
   playToken++; // invalidate any in-flight callbacks from a previous playEnglish() call
-  speechSynthesis.cancel();
   audioPlayer.onended = null;
   audioPlayer.onerror = null;
   audioPlayer.pause();
@@ -322,10 +276,7 @@ function playEnglish(en){
   stopAllAudio();
   const token = playToken;
   const files = AUDIO_MAP[en];
-  if(!files){
-    if(!NO_TTS_FALLBACK.has(en)) speak(en);
-    return;
-  }
+  if(!files) return; // no recording yet -- stay silent, no machine voice fallback
   const list = Array.isArray(files) ? files : [files];
   let i = 0;
   const playNext = ()=>{
@@ -334,12 +285,7 @@ function playEnglish(en){
     audioPlayer.src = `audio/${list[i]}`;
     audioPlayer.playbackRate = speechSpeed;
     audioPlayer.onended = ()=>{ if(token===playToken){ i++; playNext(); } };
-    audioPlayer.onerror = ()=>{ if(token===playToken) speak(en); };
-    audioPlayer.play().catch((err)=>{
-      if(token!==playToken) return; // interrupted by a newer click, not a real failure
-      if(err && err.name==="AbortError") return;
-      speak(en);
-    });
+    audioPlayer.play().catch(()=>{});
   };
   playNext();
 }
