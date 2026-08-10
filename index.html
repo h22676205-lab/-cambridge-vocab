@@ -272,20 +272,20 @@ function stopAllAudio(){
   audioPlayer.onerror = null;
   audioPlayer.pause();
 }
-function playEnglish(en){
+function playEnglish(en, onDone){
   stopAllAudio();
   const token = playToken;
   const files = AUDIO_MAP[en];
-  if(!files) return; // no recording yet -- stay silent, no machine voice fallback
+  if(!files){ if(onDone) onDone(); return; } // no recording yet -- stay silent, no machine voice fallback
   const list = Array.isArray(files) ? files : [files];
   let i = 0;
   const playNext = ()=>{
     if(token !== playToken) return; // a newer click already took over
-    if(i >= list.length) return;
+    if(i >= list.length){ if(onDone) onDone(); return; }
     audioPlayer.src = `audio/${list[i]}`;
     audioPlayer.playbackRate = speechSpeed;
     audioPlayer.onended = ()=>{ if(token===playToken){ i++; playNext(); } };
-    audioPlayer.play().catch(()=>{});
+    audioPlayer.play().catch(()=>{ if(token===playToken){ i++; playNext(); } });
   };
   playNext();
 }
@@ -466,12 +466,13 @@ function nextQuizWord(){
   quizEnEl.textContent = w.en;
   quizZhEl.textContent = (showMode==="both") ? w.zh : "";
 
-  playEnglish(w.en);
-
-  const seconds = parseFloat(intervalRange.value);
-  quizTimer = setTimeout(()=>{
-    if(!quizPaused) nextQuizWord();
-  }, seconds*1000);
+  playEnglish(w.en, ()=>{
+    // interval only starts counting once the word has actually finished playing
+    const seconds = parseFloat(intervalRange.value);
+    quizTimer = setTimeout(()=>{
+      if(!quizPaused) nextQuizWord();
+    }, seconds*1000);
+  });
 }
 
 function pauseQuiz(){
