@@ -310,13 +310,17 @@ function unlockAudio(){
   speechSynthesis.speak(warmup);
 }
 
+let playToken = 0;
 function stopAllAudio(){
+  playToken++; // invalidate any in-flight callbacks from a previous playEnglish() call
   speechSynthesis.cancel();
   audioPlayer.onended = null;
+  audioPlayer.onerror = null;
   audioPlayer.pause();
 }
 function playEnglish(en){
   stopAllAudio();
+  const token = playToken;
   const files = AUDIO_MAP[en];
   if(!files){
     if(!NO_TTS_FALLBACK.has(en)) speak(en);
@@ -325,12 +329,17 @@ function playEnglish(en){
   const list = Array.isArray(files) ? files : [files];
   let i = 0;
   const playNext = ()=>{
+    if(token !== playToken) return; // a newer click already took over
     if(i >= list.length) return;
     audioPlayer.src = `audio/${list[i]}`;
     audioPlayer.playbackRate = speechSpeed;
-    audioPlayer.onended = ()=>{ i++; playNext(); };
-    audioPlayer.onerror = ()=> speak(en);
-    audioPlayer.play().catch(()=> speak(en));
+    audioPlayer.onended = ()=>{ if(token===playToken){ i++; playNext(); } };
+    audioPlayer.onerror = ()=>{ if(token===playToken) speak(en); };
+    audioPlayer.play().catch((err)=>{
+      if(token!==playToken) return; // interrupted by a newer click, not a real failure
+      if(err && err.name==="AbortError") return;
+      speak(en);
+    });
   };
   playNext();
 }
